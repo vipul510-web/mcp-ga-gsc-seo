@@ -1,28 +1,138 @@
-# Tools (SellOnLLM Analytics MCP)
+# Tools reference — SellOnLLM Analytics MCP
 
-This MCP server is hosted by SellOnLLM:
+**Hosted endpoint:** `https://www.sellonllm.com/api/mcp`
 
-- `https://www.sellonllm.com/api/mcp`
+Claude (or another MCP client) calls these tools over **JSON-RPC**. You describe goals in natural language; the model selects tools and passes structured arguments. Row counts and date ranges are bounded so responses stay fast and safe for chat context.
 
-Exact tool names can evolve, but the connector is designed around these categories:
+---
 
-## Discovery
+## Discovery tools
 
-- **List GA4 properties**: enumerate GA4 properties the signed-in Google account can access.
-- **List Search Console sites**: enumerate verified GSC sites the account can access.
+### `list_ga4_properties`
+
+**Purpose:** Enumerate every **GA4 property** the authenticated Google user can access (Admin API).
+
+**When to use:** First message in a new thread, or whenever you are unsure which `propertyId` to pass to other tools.
+
+**Typical follow-up:** *“Use property `123456789` for all subsequent GA4 calls.”*
+
+---
+
+### `list_search_console_sites`
+
+**Purpose:** Enumerate **Search Console** properties (sites) the user can access — both URL-prefix and Domain properties where verified.
+
+**When to use:** Before any GSC query if multiple sites exist (www vs non-www, staging, regional folders).
+
+**Typical follow-up:** *“Use site `sc-domain:example.com` (or `https://www.example.com/`) for GSC.”*
+
+---
+
+## Combined snapshot
+
+### `get_seo_snapshot`
+
+**Purpose:** One opinionated call that returns a **~28-day** blend of GA4 + GSC signals — ideal for “how are we doing?” without specifying every dimension yourself.
+
+**When to use:**
+
+- Monday stand-ups
+- Client onboarding week one
+- Quick sanity check before a deeper dive
+
+**Limitation:** Less flexible than `query_ga4` / `query_search_console` — use those when you need custom breakdowns.
+
+---
 
 ## GA4 reporting
 
-- **Flexible GA4 query**: request metrics/dimensions over a date range, often with filtering and sorting.
-- **Traffic deltas**: compare last N days vs previous N days by landing page (usually organic).
+### `query_ga4`
+
+**Purpose:** Run a flexible **GA4 Data API** report: you (via Claude) choose **dimensions**, **metrics**, **date ranges**, **filters**, **order by**, and **limits**.
+
+**Common patterns:**
+
+| Question | Typical dimensions | Typical metrics |
+|----------|-------------------|-----------------|
+| Which landing pages drive organic? | `sessionSourceMedium`, `landingPagePlusQueryString` | `sessions`, `engagedSessions`, `engagementRate` |
+| Is mobile engagement worse? | `deviceCategory` | `sessions`, `engagementRate`, `averageSessionDuration` |
+| Where do conversions come from? | `sessionCampaignName`, `landingPagePlusQueryString` | `sessions`, `conversions`, `totalRevenue` (if configured) |
+
+**When to use:** Any time the snapshot is not specific enough.
+
+---
+
+### `get_traffic_deltas`
+
+**Purpose:** Compare **last N days** vs **previous N days** at the **landing page** level — optimized for “what dropped?” investigations.
+
+**When to use:**
+
+- After deployments, migrations, or indexation events
+- When organic sessions moved but you do not yet know which URLs
+
+**Pairs well with:** `query_search_console` on the same URL set for the same windows (demand vs on-site behavior).
+
+---
 
 ## Search Console reporting
 
-- **Flexible GSC query**: query clicks, impressions, CTR, position by query/page/device/country/date.
-- **CTR opportunities**: find high-impression queries/pages with low CTR.
-- **Ranking opportunities**: find pages/queries in the “close to page 1” range (e.g., position 4–15).
+### `query_search_console`
 
-## Combined SEO snapshot
+**Purpose:** Flexible **Search Analytics** query — queries, pages, countries, devices, search appearance, and **date** (depending on API constraints).
 
-- **SEO snapshot**: a combined, opinionated summary (GA4 + GSC) intended for quick briefings and weekly/monthly reviews.
+**Common patterns:**
 
+| Question | Typical dimensions |
+|----------|-------------------|
+| What are we ranking for? | `query` |
+| Which URLs earn impressions? | `page` |
+| Is mobile CTR worse? | `device` |
+| Which queries drive a specific URL? | `query`, `page` (filter) |
+
+**When to use:** Any GSC question that is not already covered by the specialized tools below.
+
+---
+
+### `find_ctr_opportunities`
+
+**Purpose:** Surfaces **high-impression** queries or pages where **CTR is low relative to opportunity** — classic snippet optimization work.
+
+**When to use:**
+
+- Title and meta experiments
+- SERP feature or intent mismatch investigations
+- “We rank but don’t get clicked”
+
+---
+
+### `find_ranking_opportunities`
+
+**Purpose:** Highlights URLs or queries sitting in **roughly positions 4–15** with meaningful impressions — candidates for on-page depth, internal links, and structured data.
+
+**When to use:**
+
+- Content sprint planning
+- Prioritizing pages that are “almost” competitive
+
+---
+
+## How tools chain together in real chats
+
+A strong pattern:
+
+1. `list_ga4_properties` + `list_search_console_sites` → disambiguate
+2. `get_seo_snapshot` → orientation
+3. `find_ctr_opportunities` **or** `find_ranking_opportunities` → backlog
+4. `query_ga4` + `query_search_console` → evidence for specific URLs
+5. `get_traffic_deltas` → confirm regressions over time
+
+You do not need to name tools yourself — describe the outcome you want; Claude will typically follow a similar chain.
+
+---
+
+## Limits & expectations
+
+- Tools return **aggregates and bounded rows** — not a full raw export of every URL on your site for all time.
+- **Sampling / thresholding:** Very large properties may hit API limits; ask for narrower date ranges or filters if a call is truncated.
+- **Model output:** Even perfect numbers need human judgment before irreversible SEO or business decisions.
