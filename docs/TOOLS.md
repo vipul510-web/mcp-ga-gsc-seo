@@ -52,9 +52,9 @@ Claude (or another MCP client) calls these tools over **JSON-RPC**. You describe
 
 **Common patterns:**
 
-| Question | Typical dimensions | Typical metrics |
-|----------|-------------------|-----------------|
-| Which landing pages drive organic? | `sessionSourceMedium`, `landingPagePlusQueryString` | `sessions`, `engagedSessions`, `engagementRate` |
+| Question | Typical dimensions (examples) | Typical metrics (examples) |
+|----------|------------------------------|-----------------------------|
+| Which landing pages drive organic? | `sessionDefaultChannelGroup`, `landingPagePlusQueryString` (often filter channel to Organic Search) | `sessions`, `engagedSessions`, `engagementRate` |
 | Is mobile engagement worse? | `deviceCategory` | `sessions`, `engagementRate`, `averageSessionDuration` |
 | Where do conversions come from? | `sessionCampaignName`, `landingPagePlusQueryString` | `sessions`, `conversions`, `totalRevenue` (if configured) |
 
